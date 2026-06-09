@@ -2,6 +2,7 @@ import mineflayer from 'mineflayer';
 import pathfinderPkg from 'mineflayer-pathfinder';
 const { pathfinder, Movements } = pathfinderPkg;
 import minecraftData from 'minecraft-data';
+import { startViewer, closeViewer } from './viewer.js';
 
 const SUPPORTED_MINECRAFT_VERSION = '1.21.11';
 
@@ -11,6 +12,7 @@ interface BotConfig {
   host: string;
   port: number;
   username: string;
+  viewerPort?: number;
 }
 
 interface ConnectionCallbacks {
@@ -71,10 +73,39 @@ export class BotConnection {
 
       const mcData = minecraftData(bot.version);
       const defaultMove = new Movements(bot, mcData);
+
+      // Allow digging sand/gravel columns. The default guard refuses to mine
+      // any block that has a falling block (sand, gravel) directly above it,
+      // which makes the pathfinder unable to navigate through or out of sandy
+      // terrain at all. Disabling it lets the bot dig through falling-block
+      // columns; the falling block above just drops and gets collected.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (defaultMove as any).dontMineUnderFallingBlock = false;
+
+      // Treat all leaf blocks as safe to walk through. Leaves are physical
+      // (boundingBox='block') so they can't go in `replaceables` — that set has
+      // a `&& !b.physical` guard. Using `carpets` instead sets b.safe=true,
+      // which lets the pathfinder pass through the bot-body space without
+      // planning digs, while still allowing the bot to stand on top of leaves.
+      const leafBlocks = [
+        'oak_leaves', 'spruce_leaves', 'birch_leaves', 'jungle_leaves',
+        'acacia_leaves', 'cherry_leaves', 'dark_oak_leaves', 'pale_oak_leaves',
+        'mangrove_leaves', 'azalea_leaves', 'flowering_azalea_leaves',
+      ];
+      for (const name of leafBlocks) {
+        const block = mcData.blocksByName[name];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (block) (defaultMove as any).carpets.add(block.id);
+      }
+
       bot.pathfinder.setMovements(defaultMove);
 
       bot.chat('LLM-powered bot ready to receive instructions!');
       this.callbacks.onLog('info', `Bot connected successfully. Username: ${this.config.username}, Server: ${this.config.host}:${this.config.port}`);
+
+      if (this.config.viewerPort) {
+        startViewer(bot, this.config.viewerPort);
+      }
     });
 
     bot.on('chat', (username, message) => {
@@ -114,6 +145,7 @@ export class BotConnection {
         try {
           bot.removeAllListeners();
           this.bot = null;
+          closeViewer();
           this.callbacks.onLog('info', 'Bot instance cleaned up after disconnect');
         } catch (err) {
           this.callbacks.onLog('warn', `Error cleaning up bot on end event: ${this.formatError(err)}`);
@@ -139,7 +171,11 @@ export class BotConnection {
       if (this.bot) {
         try {
           this.bot.removeAllListeners();
-          this.bot.quit('Reconnecting...');
+          if (typeof this.bot.quit === 'function') {
+            this.bot.quit('Reconnecting...');
+          } else {
+            this.bot.end('Reconnecting...');
+          }
           this.callbacks.onLog('info', 'Old bot instance cleaned up');
         } catch (err) {
           this.callbacks.onLog('warn', `Error while cleaning up old bot: ${this.formatError(err)}`);
@@ -192,7 +228,12 @@ export class BotConnection {
     }
     if (this.bot) {
       try {
-        this.bot.quit('Server shutting down');
+        const bot = this.bot;
+        if (typeof bot.quit === 'function') {
+          bot.quit('Server shutting down');
+        } else {
+          bot.end('Server shutting down');
+        }
       } catch (err) {
         this.callbacks.onLog('warn', `Error during cleanup: ${this.formatError(err)}`);
       }

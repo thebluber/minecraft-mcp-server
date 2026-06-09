@@ -3,7 +3,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { setupStdioFiltering } from './stdio-filter.js';
-import { log } from './logger.js';
+import { log, initLogger } from './logger.js';
 import { parseConfig } from './config.js';
 import { BotConnection } from './bot-connection.js';
 import { ToolFactory } from './tool-factory.js';
@@ -17,6 +17,9 @@ import { registerFlightTools } from './tools/flight-tools.js';
 import { registerGameStateTools } from './tools/gamestate-tools.js';
 import { registerCraftingTools } from './tools/crafting-tools.js';
 import { registerFurnaceTools } from './tools/furnace-tools.js';
+import { registerSurroundingsTools } from './tools/surroundings-tools.js';
+import { registerScreenshotTools, captureScreenshot, closeScreenshotBrowser } from './tools/screenshot-tools.js';
+import { getViewerPort, closeViewer } from './viewer.js';
 
 setupStdioFiltering();
 
@@ -30,10 +33,11 @@ process.on('uncaughtException', (error) => {
 
 async function main() {
   const config = parseConfig();
+  initLogger(config.logFile);
   const messageStore = new MessageStore();
 
   const connection = new BotConnection(
-    config,
+    { ...config, viewerPort: config.viewerPort },
     {
       onLog: log,
       onChatMessage: (username, message) => messageStore.addMessage(username, message)
@@ -47,7 +51,7 @@ async function main() {
     version: "2.0.4"
   });
 
-  const factory = new ToolFactory(server, connection);
+  const factory = new ToolFactory(server, connection, () => captureScreenshot(getViewerPort));
   const getBot = () => connection.getBot()!;
 
   registerPositionTools(factory, getBot);
@@ -59,12 +63,20 @@ async function main() {
   registerGameStateTools(factory, getBot);
   registerCraftingTools(factory, getBot);
   registerFurnaceTools(factory, getBot);
+  registerSurroundingsTools(factory, getBot);
+  registerScreenshotTools(factory, getViewerPort);
 
-  process.stdin.on('end', () => {
+  async function shutdown(reason: string) {
+    log('info', `Shutting down: ${reason}`);
     connection.cleanup();
-    log('info', 'MCP Client has disconnected. Shutting down...');
+    closeViewer();
+    await closeScreenshotBrowser();
     process.exit(0);
-  });
+  }
+
+  process.stdin.on('end', () => shutdown('MCP client disconnected (stdin closed)'));
+  process.on('SIGTERM', () => shutdown('SIGTERM received'));
+  process.on('SIGINT',  () => shutdown('SIGINT received'));
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

@@ -5,6 +5,8 @@ export interface ServerConfig {
   host: string;
   port: number;
   username: string;
+  logFile?: string;
+  viewerPort: number;
 }
 
 export function parseConfig(): ServerConfig {
@@ -23,6 +25,15 @@ export function parseConfig(): ServerConfig {
       type: 'string',
       description: 'Bot username',
       default: 'LLMBot'
+    })
+    .option('log-file', {
+      type: 'string',
+      description: 'Path to a log file (logs are always written to stderr; this adds a file)',
+    })
+    .option('viewer-port', {
+      type: 'number',
+      description: 'Port for the prismarine-viewer web server (0 to disable, default: 3007)',
+      default: 3007,
     })
     .help()
     .alias('help', 'h')

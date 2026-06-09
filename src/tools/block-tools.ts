@@ -19,17 +19,27 @@ interface FaceOption {
 export function registerBlockTools(factory: ToolFactory, getBot: () => mineflayer.Bot): void {
   factory.registerTool(
     "place-block",
-    "Place a block at the specified position",
+    "Place a block at the specified position. Pass `item` to automatically equip the block from inventory before placing — no need to call equip-item separately.",
     {
       x: z.coerce.number().describe("X coordinate"),
       y: z.coerce.number().describe("Y coordinate"),
       z: z.coerce.number().describe("Z coordinate"),
+      item: z.string().optional().describe("Item name to equip and place (e.g. 'crafting_table', 'oak_planks'). Auto-equips from inventory."),
       faceDirection: z.enum(['up', 'down', 'north', 'south', 'east', 'west']).optional().describe("Direction to place against (default: 'down')")
     },
-    async ({ x, y, z, faceDirection = 'down' }: { x: number, y: number, z: number, faceDirection?: FaceDirection }) => {
+    async ({ x, y, z, item, faceDirection = 'down' }: { x: number, y: number, z: number, item?: string, faceDirection?: FaceDirection }) => {
       ({ x, y, z } = coerceCoordinates(x, y, z));
 
       const bot = getBot();
+
+      if (item) {
+        const stack = bot.inventory.items().find(i => i.name === item);
+        if (!stack) {
+          return factory.createResponse(`Cannot place ${item}: not found in inventory. Call @list-inventory to see what you have.`);
+        }
+        await bot.equip(stack, 'hand');
+      }
+
       const placePos = new Vec3(x, y, z).floored();
       ({ x, y, z } = placePos);
 
@@ -88,30 +98,79 @@ export function registerBlockTools(factory: ToolFactory, getBot: () => mineflaye
 
   factory.registerTool(
     "dig-block",
-    "Dig a block at the specified position",
+    "Dig one or more blocks to clear a path. Provide either a single block (x, y, z) or a list of blocks via the `blocks` array. Use the array form to clear a 2-block-tall passage in one call — pass the head-level block first, then the foot-level block.",
     {
-      x: z.coerce.number().describe("X coordinate"),
-      y: z.coerce.number().describe("Y coordinate"),
-      z: z.coerce.number().describe("Z coordinate"),
+      x: z.coerce.number().optional().describe("X coordinate (single block)"),
+      y: z.coerce.number().optional().describe("Y coordinate (single block)"),
+      z: z.coerce.number().optional().describe("Z coordinate (single block)"),
+      blocks: z.array(z.object({
+        x: z.coerce.number(),
+        y: z.coerce.number(),
+        z: z.coerce.number(),
+      })).optional().describe("List of blocks to dig in order. Use instead of x/y/z to dig multiple blocks in one call."),
     },
-    async ({ x, y, z }) => {
-      ({ x, y, z } = coerceCoordinates(x, y, z));
-
+    async ({ x, y, z, blocks }) => {
       const bot = getBot();
-      const blockPos = new Vec3(x, y, z);
-      const block = bot.blockAt(blockPos);
 
-      if (!block || block.name === 'air') {
-        return factory.createResponse(`No block found at position (${x}, ${y}, ${z})`);
+      // Normalise to a flat list of positions
+      const targets: Array<{ x: number; y: number; z: number }> = [];
+      if (blocks && blocks.length > 0) {
+        for (const b of blocks) {
+          const coords = coerceCoordinates(b.x, b.y, b.z);
+          targets.push(coords);
+        }
+      } else if (x !== undefined && y !== undefined && z !== undefined) {
+        targets.push(coerceCoordinates(x, y, z));
+      } else {
+        return factory.createResponse('Provide either x/y/z or a blocks array.');
       }
 
-      if (!bot.canDigBlock(block) || !bot.canSeeBlock(block)) {
-        const goal = new goals.GoalNear(x, y, z, 2);
-        await bot.pathfinder.goto(goal);
+      const results: string[] = [];
+
+      const digOne = async (tx: number, ty: number, tz: number): Promise<string> => {
+        const blockPos = new Vec3(tx, ty, tz);
+        let block = bot.blockAt(blockPos);
+        if (!block || block.name === 'air') {
+          return `(${tx}, ${ty}, ${tz}): already air — skipped`;
+        }
+
+        const blockName = block.name;
+
+        if (!bot.canDigBlock(block) || !bot.canSeeBlock(block)) {
+          const goal = new goals.GoalNear(tx, ty, tz, 2);
+          await bot.pathfinder.goto(goal);
+          block = bot.blockAt(blockPos)!;
+        }
+
+        const harvestTools: Record<number, boolean> | undefined = (block as unknown as { harvestTools?: Record<number, boolean> }).harvestTools;
+        if (harvestTools) {
+          const tool = bot.inventory.items().find(item => harvestTools[item.type]);
+          if (tool) {
+            try { await bot.equip(tool, 'hand'); } catch { /* ignore */ }
+          }
+        }
+
+        await bot.dig(block, true, 'raycast');
+        await new Promise(resolve => setTimeout(resolve, 250));
+
+        const remaining = bot.blockAt(blockPos);
+        if (remaining && remaining.name !== 'air') {
+          await bot.dig(remaining, true, 'raycast');
+          await new Promise(resolve => setTimeout(resolve, 250));
+        }
+
+        return `(${tx}, ${ty}, ${tz}): dug ${blockName}`;
+      };
+
+      for (const t of targets) {
+        const msg = await digOne(t.x, t.y, t.z);
+        results.push(msg);
       }
 
-      await bot.dig(block);
-      return factory.createResponse(`Dug ${block.name} at (${x}, ${y}, ${z})`);
+      // Wait for drops to be collected after all digs are done
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      return factory.createResponse(results.join('\n'));
     }
   );
 
