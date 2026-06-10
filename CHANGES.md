@@ -153,7 +153,7 @@ node dist/main.js \
   --host <server-address> \
   --port 25565 \
   --username <bot-name> \
-  --viewer-port 3007      # optional — enables take-screenshot
+  --viewer-port 3007      # enables take-screenshot tool for agent to 'see' bot's environment, use 0 to disable (e.g. if getting 'too many URL images in request' error or similar) 
 ```
 
 `--viewer-port` starts the prismarine-viewer web server at `http://localhost:3007`. Without it, `take-screenshot` returns a text message and no before/after images are attached to tool responses.
