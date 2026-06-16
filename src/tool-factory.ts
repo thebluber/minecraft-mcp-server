@@ -54,11 +54,9 @@ export class ToolFactory {
         const after = wrapScreenshots ? await this.screenshotFn!() : null;
 
         if (before) {
-          result.content.push({ type: "text", text: "Before:" });
           result.content.push({ type: "image", data: before, mimeType: "image/png" });
         }
         if (after) {
-          result.content.push({ type: "text", text: "After:" });
           result.content.push({ type: "image", data: after, mimeType: "image/png" });
         }
 

@@ -172,8 +172,150 @@ If you don't have a crafting table yet, craft one first — it only needs the 2�
 
 ---
 
+## Example: Build a Starter Shelter
+
+You have been given: **stone, torches, dirt, a crafting table, and a bed.** No gathering needed — go straight to building.
+
+The shelter is a 5×5 exterior (3×3 interior), 2 blocks tall, flat stone roof. The entrance is a 1-block gap on the south wall (column bx+2).
+
+**Build order: shell first, interior last.** Complete all four walls and the roof before placing anything inside. The roof blocks need the walls as reference points, and interior items (bed, crafting table, torches) should only go in once the structure is fully enclosed.
+
+**Tool rule:** Use `@batch-place-blocks` for structural blocks (walls, roof). Use `@place-block` (single) for interior items — bed, crafting table, torches.
+
+```
+# 1. Announce and fix your anchor
+@read-chat()
+@send-chat("Building a starter shelter!")
+@scan-surroundings()
+# Record your current position as (bx, by, bz).
+# If the ground is uneven, place dirt to fill any holes now.
+```
+
+```
+# 2. North wall — z = bz, both layers (10 blocks)
+# BATCH: place all 10 blocks in ONE call — do not call place-block 10 times
+@batch-place-blocks(blocks=[
+  {x: bx,   y: by,   z: bz, item: "cobblestone"},
+  {x: bx+1, y: by,   z: bz, item: "cobblestone"},
+  {x: bx+2, y: by,   z: bz, item: "cobblestone"},
+  {x: bx+3, y: by,   z: bz, item: "cobblestone"},
+  {x: bx+4, y: by,   z: bz, item: "cobblestone"},
+  {x: bx,   y: by+1, z: bz, item: "cobblestone"},
+  {x: bx+1, y: by+1, z: bz, item: "cobblestone"},
+  {x: bx+2, y: by+1, z: bz, item: "cobblestone"},
+  {x: bx+3, y: by+1, z: bz, item: "cobblestone"},
+  {x: bx+4, y: by+1, z: bz, item: "cobblestone"}
+])
+```
+
+```
+# 3. South wall — z = bz+4, both layers, entrance gap at bx+2 (8 blocks)
+# BATCH: place all 8 blocks in ONE call — do not call place-block 8 times
+@batch-place-blocks(blocks=[
+  {x: bx,   y: by,   z: bz+4, item: "cobblestone"},
+  {x: bx+1, y: by,   z: bz+4, item: "cobblestone"},
+  {x: bx+3, y: by,   z: bz+4, item: "cobblestone"},
+  {x: bx+4, y: by,   z: bz+4, item: "cobblestone"},
+  {x: bx,   y: by+1, z: bz+4, item: "cobblestone"},
+  {x: bx+1, y: by+1, z: bz+4, item: "cobblestone"},
+  {x: bx+3, y: by+1, z: bz+4, item: "cobblestone"},
+  {x: bx+4, y: by+1, z: bz+4, item: "cobblestone"}
+])
+```
+
+```
+# 4. West wall — x = bx, both layers, skip corners (6 blocks)
+# BATCH: place all 6 blocks in ONE call — do not call place-block 6 times
+@batch-place-blocks(blocks=[
+  {x: bx, y: by,   z: bz+1, item: "cobblestone"},
+  {x: bx, y: by,   z: bz+2, item: "cobblestone"},
+  {x: bx, y: by,   z: bz+3, item: "cobblestone"},
+  {x: bx, y: by+1, z: bz+1, item: "cobblestone"},
+  {x: bx, y: by+1, z: bz+2, item: "cobblestone"},
+  {x: bx, y: by+1, z: bz+3, item: "cobblestone"}
+])
+```
+
+```
+# 5. East wall — x = bx+4, both layers, skip corners (6 blocks)
+# BATCH: place all 6 blocks in ONE call — do not call place-block 6 times
+@batch-place-blocks(blocks=[
+  {x: bx+4, y: by,   z: bz+1, item: "cobblestone"},
+  {x: bx+4, y: by,   z: bz+2, item: "cobblestone"},
+  {x: bx+4, y: by,   z: bz+3, item: "cobblestone"},
+  {x: bx+4, y: by+1, z: bz+1, item: "cobblestone"},
+  {x: bx+4, y: by+1, z: bz+2, item: "cobblestone"},
+  {x: bx+4, y: by+1, z: bz+3, item: "cobblestone"}
+])
+```
+
+```
+# 6. Roof — y = by+2, full 5×5 (25 blocks)
+# BATCH: place all 25 blocks in ONE call — do not call place-block 25 times
+@batch-place-blocks(blocks=[
+  {x: bx,   y: by+2, z: bz,   item: "cobblestone"},
+  {x: bx+1, y: by+2, z: bz,   item: "cobblestone"},
+  {x: bx+2, y: by+2, z: bz,   item: "cobblestone"},
+  {x: bx+3, y: by+2, z: bz,   item: "cobblestone"},
+  {x: bx+4, y: by+2, z: bz,   item: "cobblestone"},
+  {x: bx,   y: by+2, z: bz+1, item: "cobblestone"},
+  {x: bx+1, y: by+2, z: bz+1, item: "cobblestone"},
+  {x: bx+2, y: by+2, z: bz+1, item: "cobblestone"},
+  {x: bx+3, y: by+2, z: bz+1, item: "cobblestone"},
+  {x: bx+4, y: by+2, z: bz+1, item: "cobblestone"},
+  {x: bx,   y: by+2, z: bz+2, item: "cobblestone"},
+  {x: bx+1, y: by+2, z: bz+2, item: "cobblestone"},
+  {x: bx+2, y: by+2, z: bz+2, item: "cobblestone"},
+  {x: bx+3, y: by+2, z: bz+2, item: "cobblestone"},
+  {x: bx+4, y: by+2, z: bz+2, item: "cobblestone"},
+  {x: bx,   y: by+2, z: bz+3, item: "cobblestone"},
+  {x: bx+1, y: by+2, z: bz+3, item: "cobblestone"},
+  {x: bx+2, y: by+2, z: bz+3, item: "cobblestone"},
+  {x: bx+3, y: by+2, z: bz+3, item: "cobblestone"},
+  {x: bx+4, y: by+2, z: bz+3, item: "cobblestone"},
+  {x: bx,   y: by+2, z: bz+4, item: "cobblestone"},
+  {x: bx+1, y: by+2, z: bz+4, item: "cobblestone"},
+  {x: bx+2, y: by+2, z: bz+4, item: "cobblestone"},
+  {x: bx+3, y: by+2, z: bz+4, item: "cobblestone"},
+  {x: bx+4, y: by+2, z: bz+4, item: "cobblestone"}
+])
+```
+
+```
+# 7. Furnish — use single @place-block for each interior item
+@place-block(x=bx+1, y=by, z=bz+1, item="crafting_table")
+
+# Bed occupies 2 blocks: foot at the placed position, head one block in the
+# direction the bot is currently facing. Face south first so the head lands
+# at (bx+3, by, bz+2) — both positions must be clear before placing.
+@face-toward(x=bx+3, z=bz+2)   ← face south so the head block goes to bz+2
+@place-block(x=bx+3, y=by, z=bz+1, item="bed")
+
+# Torches go in the AIR space next to a wall, faceDirection points AT the wall block
+# North wall torch: air at bz+1, facing the north wall (z=bz)
+@place-block(x=bx+2, y=by+1, z=bz+1, item="torch", faceDirection="north")
+# South wall torch: air at bz+3, facing the south wall (z=bz+4)
+@place-block(x=bx+2, y=by+1, z=bz+3, item="torch", faceDirection="south")
+```
+
+```
+# 8. Confirm
+@scan-surroundings()
+@send-chat("Shelter done!")
+```
+
+**Notes:**
+- Replace bx, by, bz with the actual coordinates from step 1 before calling anything.
+- Each wall/roof step is ONE `@batch-place-blocks(blocks=[...])` call. Never call `@place-block` in a loop block-by-block.
+- If a block fails ("already a block there"), call @scan-surroundings and skip that coordinate.
+- **Bed placement:** a bed needs 2 clear floor blocks. Always call @face-toward toward the head position first, then place at the foot position. If placement fails, check that the head block position is also free.
+- Sleeping in the bed sets your spawn point — do it before nightfall.
+
+---
+
 ## Tips
 
+- **Batching blocks:** When placing more than one block, ALWAYS pass all of them in a single `@batch-place-blocks(blocks=[...])` call. Never call `@place-block` in a loop — batch everything into one call.
 - Call @scan-surroundings after every movement to re-orient — never assume position.
 - @can-craft before @craft-item — it tells you exactly what's missing.
 - @find-blocks with count > 1 returns multiple locations so you can chain digs.
